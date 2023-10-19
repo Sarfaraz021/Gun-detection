@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GUN Detection System in Real-Time</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #FF8C00; /* Orange color */
+        }
+
+        .button {
+            background-color: #FF8C00; /* Orange color */
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .button:hover {
+            background-color: #FFA500; /* Lighter shade of orange on hover */
+        }
+
+        #cameraStream {
+            display: none;
+            max-width: 100%;
+            border-radius: 10px;
+        }
+        
+        #processedStream {
+            display: none;
+            max-width: 100%;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GUN Detection System in Real-Time</h1>
+        <button id="cameraButton" class="button" onclick="openCamera()">
+            Open Camera
+        </button>
+        <button id="stopCameraButton" class="button" onclick="stopCamera()" style="display: none;">
+            Stop Camera
+        </button>
+        <video id="cameraStream" autoplay playsinline></video>
+        <img id="processedStream" alt="Processed Frame">
+    </div>
+
+    <script>
+        const cameraButton = document.getElementById('cameraButton');
+        const stopCameraButton = document.getElementById('stopCameraButton');
+        const cameraStream = document.getElementById('cameraStream');
+        const processedStream = document.getElementById('processedStream');
+        let stream;
+
+        function openCamera() {
+            cameraButton.style.display = 'none';
+            stopCameraButton.style.display = 'block';
+            cameraStream.style.display = 'block';
+            processedStream.style.display = 'block';
+
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(mediaStream => {
+                    stream = mediaStream;
+                    cameraStream.srcObject = stream;
+                })
+                .catch(error => console.error('Error accessing the camera:', error));
+
+            // Start sending and displaying processed frames
+            startSendingFrames();
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+
+            stopCameraButton.style.display = 'none';
+            cameraButton.style.display = 'block';
+            cameraStream.style.display = 'none';
+            processedStream.style.display = 'none';
+            cameraStream.srcObject = null;
+            processedStream.src = ''; // Clear the processed image
+        }
+
+        function startSendingFrames() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = cameraStream.videoWidth;
+            canvas.height = cameraStream.videoHeight;
+
+            ctx.drawImage(cameraStream, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(blob => {
+                const formData = new FormData();
+                formData.append('frame', blob);
+
+                fetch('/process_frame', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.blob())
+                .then(processedBlob => {
+                    const processedUrl = URL.createObjectURL(processedBlob);
+                    processedStream.src = processedUrl;
+
+                    // Recursively send and display processed frames
+                    startSendingFrames();
+                });
+            }, 'image/jpeg', 0.9);
+        }
+    </script>
+</body>
+</html>
